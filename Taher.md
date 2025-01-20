@@ -129,4 +129,102 @@ Use efficient networking via **Ethernet** or a local wireless network to ensure 
 
 ---
 
-Let me know if you need more details on any specific step!
+#Split into two part
+
+---
+
+### **Step 1: Load the GPT-2 Model**
+First, install the required dependencies if you haven't already:
+
+```bash
+pip install torch transformers
+```
+
+Now, load the model:
+
+```python
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+# Load GPT-2 model and tokenizer
+model_name = "gpt2"
+model = AutoModelForCausalLM.from_pretrained(model_name)
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+# Save the entire model for reference (optional)
+torch.save(model.state_dict(), "gpt2_full.pth")
+```
+
+---
+
+### **Step 2: Split the Model into Two Parts**
+GPT-2 consists of transformer blocks (e.g., 12 for GPT-2 small). We can split them into two halves.
+
+```python
+# Get all transformer blocks
+transformer_blocks = model.transformer.h
+
+# Split model into two halves
+midpoint = len(transformer_blocks) // 2
+part1_blocks = transformer_blocks[:midpoint]
+part2_blocks = transformer_blocks[midpoint:]
+
+# Create two separate model parts
+model_part1 = torch.nn.Sequential(*part1_blocks)
+model_part2 = torch.nn.Sequential(*part2_blocks)
+
+# Save the two parts separately
+torch.save(model_part1.state_dict(), "gpt2_part1.pth")
+torch.save(model_part2.state_dict(), "gpt2_part2.pth")
+
+print("Model successfully split into two parts.")
+```
+
+---
+
+### **Step 3: Transfer the Model Parts to Different Laptops**
+After splitting, transfer each part to the respective machine using SCP:
+
+```bash
+scp "E:\GitHub_Desktop\Geo-Distributed-Large-Language-Model\gpt2_part1_taher.pth" user@laptop1:/path/to/store/
+scp "E:\GitHub_Desktop\Geo-Distributed-Large-Language-Model\gpt2_part2_rabiul.pth" "Robiul Hasan@192.168.0.103:'D:\University of Oulu\Last Education\1st Year\3rd Period\DS'"
+```
+
+Replace `user`, `laptop1/laptop2`, and `/path/to/store/` with your actual details.
+
+---
+
+### **Step 4: Load and Run Inference Separately**
+On each laptop, load and process its part of the model.
+
+**Laptop 1 (part 1):**
+```python
+import torch
+from transformers import AutoTokenizer
+
+model_part1 = torch.load("gpt2_part1.pth")
+tokenizer = AutoTokenizer.from_pretrained("gpt2")
+
+input_text = "Once upon a time"
+input_ids = tokenizer(input_text, return_tensors="pt").input_ids
+
+# Process through first half
+output_part1 = model_part1(input_ids)
+torch.save(output_part1, "output_part1.pth")
+```
+
+**Laptop 2 (part 2):**
+```python
+import torch
+
+model_part2 = torch.load("gpt2_part2.pth")
+output_part1 = torch.load("output_part1.pth")
+
+# Process through second half
+final_output = model_part2(output_part1)
+print("Final output:", final_output)
+```
+
+---
+
+This approach allows you to split the model across two laptops and run inference collaboratively. Let me know if you need any clarification!
