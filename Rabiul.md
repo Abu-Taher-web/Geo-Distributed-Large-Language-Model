@@ -57,7 +57,30 @@ ssh username@<other-laptop-ip>
 
 Replace `username` with the actual Windows username of the other laptop.
 
+--------------------------------------
+# Troubleshooting "Request Timed Out" When Pinging a Laptop on the Same Network
+
+If you are unable to ping one laptop from another on the same network and receive a `"Request timed out"` message, it typically indicates a configuration or network issue. Follow the steps below to troubleshoot and resolve the problem.
+
 ---
+
+## **Steps to Resolve the Issue**
+
+### **1. Check the Firewall Settings**
+The Windows Firewall may be blocking ICMP (ping) requests:
+1. On the target laptop (the one being pinged), open the **Start menu**, type `Windows Security`, and open it.
+2. Navigate to **Firewall & network protection > Advanced settings**.
+3. In the left pane, click **Inbound Rules**.
+4. Locate the rule: **File and Printer Sharing (Echo Request - ICMPv4-In)**.
+5. If this rule is disabled, right-click it and select **Enable Rule**.
+6. Repeat the same for **ICMPv6-In** if you want to allow IPv6 ping.
+
+---
+
+### **2. Check Network Connection**
+1. Ensure both laptops are connected to the same network (Wi-Fi or Ethernet).
+2. Run the following command on both laptops to verify thei
+---------------------------------------
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 
