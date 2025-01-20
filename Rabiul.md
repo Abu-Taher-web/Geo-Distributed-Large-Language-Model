@@ -58,5 +58,40 @@ ssh username@<other-laptop-ip>
 Replace `username` with the actual Windows username of the other laptop.
 
 ---
+from transformers import AutoModelForCausalLM, AutoTokenizer
+import torch
 
-Let me know if you encounter any issues!
+model_name = "gpt2"
+
+# Load GPT-2 model (quantized for low memory)
+#model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto", load_in_4bit=True)
+model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto")
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+# Save model in chunks for splitting (if necessary)
+torch.save(model.state_dict(), "gpt2_model_split.pth")
+# Get the state dictionary of the model
+state_dict = model.state_dict()
+
+# Print out the keys to see the model layers (for splitting)
+for key in state_dict.keys():
+    print(key)
+
+# Get all transformer blocks
+transformer_blocks = model.transformer.h
+
+# Split model into two halves
+midpoint = len(transformer_blocks) // 2
+part1_blocks = transformer_blocks[:midpoint]
+part2_blocks = transformer_blocks[midpoint:]
+
+# Create two separate model parts
+model_part1 = torch.nn.Sequential(*part1_blocks)
+model_part2 = torch.nn.Sequential(*part2_blocks)
+
+# Save the two parts separately
+torch.save(model_part1.state_dict(), "gpt2_part1_taher.pth")
+torch.save(model_part2.state_dict(), "gpt2_part2_rabiul.pth")
+
+print("Model successfully split into two parts.")
+
