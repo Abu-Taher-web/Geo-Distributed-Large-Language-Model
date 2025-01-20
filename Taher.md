@@ -227,4 +227,136 @@ print("Final output:", final_output)
 
 ---
 
-This approach allows you to split the model across two laptops and run inference collaboratively. Let me know if you need any clarification!
+# How to send inference data from one laptop to another.
+If the GPT-2 model is split in such a way that part 2 depends on the output of part 1 (i.e., the output of part 1 is the input for part 2), you will need a way to synchronize the flow between both parts during inference. This means that the model can’t perform the inference entirely in parallel without some level of coordination.
+
+Here's how you can approach this:
+
+### 1. **Sequential Dependency Between Parts**:
+   - **Laptop 1 (Master)**: Runs **Part 1** of the model and performs inference on the input data. Once the inference is complete, it sends the output to **Laptop 2**.
+   - **Laptop 2 (Worker)**: Receives the output from **Laptop 1**, uses it as input for **Part 2**, and performs inference.
+   - **Result Collection**: After **Laptop 2** finishes, it sends the final result back to **Laptop 1** for further processing or display.
+
+### 2. **Setup for Communication Between Laptops**:
+   Since the two parts are sequential, you’ll need a way to pass data between the two laptops.
+
+   - You can use **Sockets** or **HTTP Requests** for communication between laptops:
+     - **Sockets**: Create a socket server on Laptop 2 and a client on Laptop 1. Once Laptop 1 completes its part of the inference, it sends the output via the socket to Laptop 2.
+     - **HTTP Requests**: You can set up a lightweight server (using Flask or FastAPI) on Laptop 2 to receive the output from Laptop 1 as a POST request and then proceed with the inference on part 2.
+
+### 3. **Implementation Example (using Sockets)**:
+   Here's a simple example using Python’s `socket` library to communicate between the two laptops.
+
+   **Laptop 1 (Master - Sends data to Laptop 2):**
+   ```python
+   import socket
+   import torch
+   from transformers import GPT2Model, GPT2Tokenizer
+
+   # Load Part 1 of GPT-2 model
+   tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+   model_part_1 = GPT2Model.from_pretrained("gpt2")
+
+   # Prepare the input
+   input_text = "This is the input for part 1."
+   inputs = tokenizer(input_text, return_tensors="pt")
+
+   # Perform inference on part 1
+   with torch.no_grad():
+       output_part_1 = model_part_1(**inputs)
+
+   # Send output to Laptop 2 via socket
+   part_1_output = output_part_1.last_hidden_state.numpy()
+   
+   # Connect to Laptop 2 (Worker) via socket
+   sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+   sock.connect(('laptop_2_ip', 12345))  # Replace with Laptop 2's IP
+   sock.sendall(part_1_output.tobytes())
+   sock.close()
+   ```
+
+   **Laptop 2 (Worker - Receives and processes data):**
+   ```python
+   import socket
+   import torch
+   from transformers import GPT2LMHeadModel, GPT2Tokenizer
+
+   # Load Part 2 of GPT-2 model
+   tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+   model_part_2 = GPT2LMHeadModel.from_pretrained("gpt2")
+
+   # Set up the socket server
+   server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+   server_socket.bind(('0.0.0.0', 12345))  # Listen on all interfaces, port 12345
+   server_socket.listen(1)
+   print("Waiting for connection...")
+   client_socket, _ = server_socket.accept()
+
+   # Receive output from Laptop 1
+   part_1_output = client_socket.recv(4096)  # Adjust buffer size if needed
+   part_1_output = torch.from_numpy(np.frombuffer(part_1_output, dtype=np.float32))
+
+   # Perform inference on part 2
+   with torch.no_grad():
+       output_part_2 = model_part_2(inputs_embeds=part_1_output)
+
+   print("Inference on part 2 complete.")
+   client_socket.close()
+   ```
+
+### 4. **HTTP Setup with Flask (Alternative)**:
+   If you prefer HTTP requests instead of sockets, you can use Flask to create a server on Laptop 2 that listens for POST requests from Laptop 1.
+
+   **Laptop 2 (Worker - Flask server)**:
+   ```python
+   from flask import Flask, request, jsonify
+   import torch
+   from transformers import GPT2LMHeadModel
+
+   app = Flask(__name__)
+
+   model_part_2 = GPT2LMHeadModel.from_pretrained("gpt2")
+
+   @app.route('/process', methods=['POST'])
+   def process():
+       data = request.get_json()
+       part_1_output = torch.tensor(data['output_part_1'])
+
+       with torch.no_grad():
+           output_part_2 = model_part_2(inputs_embeds=part_1_output)
+       
+       return jsonify({'result': output_part_2.tolist()})
+
+   if __name__ == '__main__':
+       app.run(host='0.0.0.0', port=5000)
+   ```
+
+   **Laptop 1 (Master - Sends data via HTTP)**:
+   ```python
+   import requests
+   import torch
+   from transformers import GPT2Model, GPT2Tokenizer
+
+   tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+   model_part_1 = GPT2Model.from_pretrained("gpt2")
+
+   input_text = "This is the input for part 1."
+   inputs = tokenizer(input_text, return_tensors="pt")
+
+   with torch.no_grad():
+       output_part_1 = model_part_1(**inputs)
+
+   part_1_output = output_part_1.last_hidden_state.numpy().tolist()
+
+   # Send output to Laptop 2 via HTTP
+   response = requests.post('http://laptop_2_ip:5000/process', json={'output_part_1': part_1_output})
+   result = response.json()
+   print("Part 2 Output:", result['result'])
+   ```
+
+### Summary:
+- Since **Part 2** depends on **Part 1**, you'll need to transfer the output from **Laptop 1 (Master)** to **Laptop 2 (Worker)** for further processing.
+- You can use **Sockets** or **HTTP** for this data exchange.
+- The flow will be sequential, but you still need network communication between the laptops to pass data back and forth.
+
+Let me know if you need more help with the code or network setup!
