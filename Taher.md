@@ -360,3 +360,35 @@ Here's how you can approach this:
 - The flow will be sequential, but you still need network communication between the laptops to pass data back and forth.
 
 Let me know if you need more help with the code or network setup!
+
+There are **four main types of parallelism** used in deep learning, especially for large models like GPT-2 XL:  
+
+### **1. Data Parallelism (DP)**  
+- Each device (CPU/GPU) gets a **copy of the entire model** but processes **different data batches**.  
+- Requires **synchronization** to update weights across devices.  
+- Works well when model **fits in memory but dataset is large**.  
+- Example: **PyTorch DDP (Distributed Data Parallel)**  
+
+### **2. Model Parallelism (MP)**  
+- The model itself is **split across multiple devices** (e.g., layers are divided).  
+- Useful when **the model is too large for one device**.  
+- Can be **pipeline parallelism** (split by layers) or **tensor parallelism** (split within layers).  
+- Example: **DeepSpeed, Megatron-LM**  
+
+### **3. Pipeline Parallelism (PP)** (a type of Model Parallelism)  
+- Divides the model into **stages** (e.g., each PC handles a group of layers).  
+- Data flows **sequentially through the pipeline** (like an assembly line).  
+- Reduces memory usage per device but adds **latency due to sequential execution**.  
+- Example: **GPipe, DeepSpeed pipeline parallelism**  
+
+### **4. Tensor Parallelism (TP)** (another type of Model Parallelism)  
+- **Each layer is split across devices** at the tensor level.  
+- More fine-grained than pipeline parallelism, **reduces memory per device**.  
+- Requires high-speed interconnects for tensor communication.  
+- Example: **Megatron-LM, NVIDIA Tensor Parallelism**  
+
+Since you have **two PCs**, the best option depends on the model size:  
+- **GPT-2 Medium (355M):** Data Parallelism (one model per PC).  
+- **GPT-2 XL (1.5B):** Model Parallelism (split across PCs).  
+
+Which one do you want to implement?
